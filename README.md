@@ -36,7 +36,7 @@ Search for all objects with the word Jaberwock
 
 **Request**
 
-http://localhost:52773/cubes/test/object?$query=Jaberwocky
+http://localhost:52773/cubes/test/object?$query=Jaberwock
 
 **Response**
 
