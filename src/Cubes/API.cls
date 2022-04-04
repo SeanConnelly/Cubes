@@ -16,7 +16,7 @@ XData UrlMap [ XMLNamespace = "http://www.intersystems.com/urlmap" ]
 <Routes>
   <Route Url="/" Method="get" Call="listCubes" />
   <Route Url="/:cube" Method="post" Call="registerCube" />
-  <Route Url="/:cube/object" Method="post" Call="insertObject" />
+  <Route Url="/:cube/object/:name" Method="post" Call="insertObject" />
   <Route Url="/:cube/object" Method="get" Call="findObjects" />
   <Route Url="/:cube/object/:oid" Method="get" Call="getObjectById" />  
   <Route Url="/:cube/object/:oid" Method="put" Call="updateObject" />
@@ -55,18 +55,18 @@ ClassMethod getObjectById(pCubeName As %String, pOID As %Integer) As %Status
 	quit $$$OK
 }
 
-ClassMethod insertObject(pCubeName As %String) As %Status
+ClassMethod insertObject(pCubeName As %String, pObjectName As %String = "") As %Status
 {
 	set CID=##class(Cubes.Cube).GetId(pCubeName)
 	if CID=0 return ..ReportHttpStatusCode(404)
-	quit ##class(Cubes.Object).Upsert(CID,%request.Content,%request.ContentType)
+	quit ##class(Cubes.Object).Upsert(CID,%request.Content,%request.ContentType,pObjectName)
 }
 
 ClassMethod updateObject(pCubeName As %String, pOID As %Integer) As %Status
 {
 	set CID=##class(Cubes.Cube).GetId(pCubeName)
 	if CID=0 quit ..ReportHttpStatusCode(404)
-	set sc=##class(Cubes.Object).Upsert(CID,%request.Content,%request.ContentType,pOID)
+	set sc=##class(Cubes.Object).Upsert(CID,%request.Content,%request.ContentType,"",pOID)
 	if $$$ISERR(sc) quit ..ReportHttpStatusCode(404)
 	quit $$$OK
 }

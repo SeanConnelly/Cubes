@@ -1,11 +1,15 @@
 Class Cubes.Object Extends %RegisteredObject
 {
 
-ClassMethod Upsert(pCubeId As %Integer, pContent As %CSP.CharacterStream, pContentType As %String, ByRef pOID As %Integer = "") As %Status
+ClassMethod Upsert(pCubeId As %Integer, pContent As %CSP.CharacterStream, pContentType As %String, pObjectName As %String = "", ByRef pOID As %Integer = "") As %Status
 {
-	if pOID'="",'$d(^CubesD(pCubeId)) quit $$$ERROR($$$GeneralError,"404 Object does not exist")
+	if pOID'="" {
+		if $d(^CubesD(pCubeId)) quit $$$ERROR($$$GeneralError,"404 Object does not exist")
+		if pContentType="" set pContentType=$lg(^CubesD(pCubeId,pOID,0),2)
+	}
 	if pOID="" set pOID=$i(^CubesD(pCubeId))
-	set ^CubesD(pCubeId,pOID,0)=pContentType
+	set pObjectName=$replace(pObjectName,"%2F","/")
+	set ^CubesD(pCubeId,pOID,0)=$lb(pContentType,pObjectName)
 	while pContent.AtEnd=0 {
 		set ^CubesD(pCubeId,pOID,$i(^CubesD(pCubeId,pOID)))=pContent.ReadLine()
 	}
@@ -39,10 +43,15 @@ ClassMethod OutputObjectToResponse(pCubeId As %Integer, pOID As %Integer) As %St
 ClassMethod OutputObjectQueryToResponse(pCubeId As %Integer)
 {
 	set query=$get(%request.Data("$query",1))
+	//for now queries only work with alpha numericri
+	//stngs,es so do a dumb strip leaving minus and 
+	//wildcard, the index work the same way, so we
+	//will still get hits=$tr(query,"^%$##()"," ")
 	
 	//build a list of includes and excludes
 	for i=1:1:$l(query," ") {
 		set word=$p(query," ",i)
+		if word="" continue
 		if $e(word)="-" {
 			set word=$e(word,2,*)
 			if $d(^CubesI(pCubeId,word)) {
@@ -111,7 +120,9 @@ ClassMethod OutputObjectQueryToResponse(pCubeId As %Integer)
 			set ln=$order(^CubesI(pCubeId,word,oid,""))
 			while ln'="" {
 				set text=$get(^CubesD(pCubeId,oid,ln),"")
-				set result=[(pCubeId),(word),(oid),(ln),(text)]
+				set type=$lg(^CubesD(pCubeId,oid,0),1)
+				set name=$lg(^CubesD(pCubeId,oid,0),2)
+				set result=[(pCubeId),(word),(oid),(name),(ln),(text)]
 				if text'="" do results.%Push(result)
 				set ln=$order(^CubesI(pCubeId,word,oid,ln))
 			}
