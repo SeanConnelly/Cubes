@@ -78,4 +78,4 @@ As an example the project now includes a "Cubes.Tools" class that loads all the 
 
 Here we can see a screen shot of a simple web search page that uses the Cubes API to fetch search results for all occurences of "classmethod" in the %SYS source code Cube.
 
-![Web Search Screenshot](/screen-shot.png)
+![Web Search Screenshot](/screen-recording.gif)
