@@ -43,12 +43,8 @@ ClassMethod OutputObjectToResponse(pCubeId As %Integer, pOID As %Integer) As %St
 ClassMethod OutputObjectQueryToResponse(pCubeId As %Integer)
 {
 	set query=$get(%request.Data("$query",1))
-	//for now queries only work with alpha numericri
-	//stngs,es so do a dumb strip leaving minus and 
-	//wildcard, the index work the same way, so we
-	//will still get hits=$tr(query,"^%$##()"," ")
+	set query=$tr(query,"[,\/#!$%\^&\;:{}=\_`~()","                       ")
 	
-	//build a list of includes and excludes
 	for i=1:1:$l(query," ") {
 		set word=$p(query," ",i)
 		if word="" continue
@@ -60,10 +56,10 @@ ClassMethod OutputObjectQueryToResponse(pCubeId As %Integer)
 		} elseif $e(word,*)="*" {
 			set w1=$e(word,1,*-1)
 			set w2=$o(^CubesI(pCubeId,w1))
-			set w3=$o(^CubesI(pCubeId,w1_"ZZZ"))
-			while (w2'="")!(w2'=w3) {
+			while (w2'=""),($e(w2,1,$l(w1))=w1) {
 				set freq=^CubesI(pCubeId,w2)
-				set include(freq,w2)="" 
+				set include(freq,w2)=""
+				set w2=$o(^CubesI(pCubeId,w2))
 			}
 		} else {
 			if $d(^CubesI(pCubeId,word)) {
@@ -145,11 +141,11 @@ ClassMethod BuildIndices(pCubeId As %Integer, pOID As %Integer)
 				set word=word_char		
 			} else {
 				if word'="" {
-					//if the word count grows to 5000 then consider it noise (todo: move this to config)
-					if $d(^CubesI(pCubeId,word)),(^CubesI(pCubeId,word)>4999) {
+					//if the word count grows to 25000 then consider it noise (todo: move this to config)
+					if $d(^CubesI(pCubeId,word)),(^CubesI(pCubeId,word)>24999) {
 						if $d(^CubesI(pCubeId,word))=11 {
 							kill ^CubesI(pCubeId,word)
-							set ^CubesI(pCubeId,word)=5000
+							set ^CubesI(pCubeId,word)=25000
 						}
 					} else {
 						set ^CubesI(pCubeId,word,pOID,ln)=""

@@ -35,12 +35,14 @@ ClassMethod OnPage() As %Status [ ServerOnly = 1 ]
 		.pad3 { padding: 0.8em; }
 		.pad4 { padding: 0.6em; }
 		.pad5 { padding: 0.4em; }
+		.padtop { padding: 0.5em; }
 		.center { text-align: center; }
-		.right { text-align: right; }
+		.right { text-align: right; padding-right: 1em; }
 		.search { width: 400px; }
 		.results { font-size: 0.8em;}
 		.results table { width: 2000px; }
-		.grey { color: grey; }
+		.blue { color: #05B8CC; }
+		.lineno { color: #5B59BA; font-style: italic; width: 5em; padding-right: 1em;}
 		</style>
 	</head>
 	<body>
@@ -66,7 +68,7 @@ ClassMethod OnPage() As %Status [ ServerOnly = 1 ]
 		var resultsContainer=document.getElementById("resultsContainer");
 		searchButton.addEventListener("click", function(ev) {
 			var start = new Date().getTime();
-			fetch('http://localhost:52773/cubes/codesys/object?$query=' + searchText.value)
+			fetch('http://localhost:52773/cubes/codesys/object?$query=' + searchText.value.replace(/[,\/#!$%\^&\;:{}=\_`~()]/g," "))
 			.then(function(res){return res.json()})
 			.then(function(data){
 				var last='';
@@ -75,13 +77,14 @@ ClassMethod OnPage() As %Status [ ServerOnly = 1 ]
 					if (name === last) name="";
 					last = item[3];
 					var code=escapeHTML(item[5]);
-					searchText.value.split(" ").map( function(word) {
+					searchText.value.replace(/[,\/#!$%\^&\;:{}=\_`~()]/g," ").split(" ").map( function(word) {
+						word=escapeHTML(word);
 						if (word === "") return;
 						if (code.indexOf(word) > -1) {
 							code = code.replace(word,'<b>' + word + '</b>');
 						}
 					});
-					return '<tr><td colspan=2 class="grey">'+name+'</td></tr><tr><td>'+item[4]+'</td><td>'+code+'</td></tr>'
+					return '<tr><td colspan=2 class="blue pad4">'+name+'</td></tr><tr><td class="right lineno">'+item[4]+'</td><td>'+code+'</td></tr>'
 				}).join('');
 				var end = new Date().getTime();
 				var time = end - start; 
