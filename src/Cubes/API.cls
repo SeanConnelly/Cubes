@@ -50,6 +50,10 @@ ClassMethod getObjectById(pCubeName As %String, pOID As %Integer) As %Status
 {
 	set CID=##class(Cubes.Cube).GetId(pCubeName)
 	if CID=0 return ..ReportHttpStatusCode(404)
+	
+	set %response.ContentType="plain/text"
+	//do %response.SetHeader("Content-Disposition","attachment;filename=""data.json""")
+	
 	set sc=##class(Cubes.Object).OutputObjectToResponse(CID,pOID)
 	if $$$ISERR(sc) quit ..ReportHttpStatusCode(404)
 	quit $$$OK

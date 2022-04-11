@@ -10,6 +10,8 @@
 
 ### Introduction
 
+[![Cubes Demonstration](YouTubeVideo.png)](https://www.youtube.com/watch?v=tZ7ZsrQdu08 "Cubes Demonstration")
+
 Cubes are data silos for storing buckets of text based objects, such as:-
 
 * HTML

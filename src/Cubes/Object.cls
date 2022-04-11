@@ -10,6 +10,10 @@ ClassMethod Upsert(pCubeId As %Integer, pContent As %CSP.CharacterStream, pConte
 	if pOID="" set pOID=$i(^CubesD(pCubeId))
 	set pObjectName=$replace(pObjectName,"%2F","/")
 	set ^CubesD(pCubeId,pOID,0)=$lb(pContentType,pObjectName)
+	
+	//make a cube option? or an upser value?
+	set pContent.LineTerminator=$c(10)
+	
 	while pContent.AtEnd=0 {
 		set ^CubesD(pCubeId,pOID,$i(^CubesD(pCubeId,pOID)))=pContent.ReadLine()
 	}
@@ -44,7 +48,9 @@ ClassMethod OutputObjectQueryToResponse(pCubeId As %Integer)
 {
 	set query=$get(%request.Data("$query",1))
 	set query=$tr(query,"[,\/#!$%\^&\;:{}=\_`~()","                       ")
+	//set query=$zcvt(query,"L")
 	
+	//split the search query string up into an array of includes and excludes
 	for i=1:1:$l(query," ") {
 		set word=$p(query," ",i)
 		if word="" continue
@@ -54,17 +60,14 @@ ClassMethod OutputObjectQueryToResponse(pCubeId As %Integer)
 				set exclude(word)=""	
 			}			
 		} elseif $e(word,*)="*" {
-			set w1=$e(word,1,*-1)
-			set w2=$o(^CubesI(pCubeId,w1))
-			while (w2'=""),($e(w2,1,$l(w1))=w1) {
-				set freq=^CubesI(pCubeId,w2)
-				set include(freq,w2)=""
-				set w2=$o(^CubesI(pCubeId,w2))
-			}
+			set wildcards($p(word,"*"))=""
 		} else {
 			if $d(^CubesI(pCubeId,word)) {
 				set freq=^CubesI(pCubeId,word)
-				set include(freq,word)=""	
+				set include(freq,word)=""
+				set words(word)=""	
+			} else {
+				set include(0,word)=""
 			}	
 		}
 	}
@@ -76,7 +79,7 @@ ClassMethod OutputObjectQueryToResponse(pCubeId As %Integer)
 		while word'="" {
 			set oid=$o(^CubesI(pCubeId,word,""))
 			while oid'="" {
-				set oids(oid)=$g(oids(oid))_"~"_word
+				set oids(oid)=$get(oids(oid))_" "_word
 				set oid=$o(^CubesI(pCubeId,word,oid))
 			}
 			set word=$o(include(freq,word))
@@ -86,46 +89,83 @@ ClassMethod OutputObjectQueryToResponse(pCubeId As %Integer)
 	//now cross check that each of these oids is either in the other includes or should be excluded
 	set oid=$order(oids(""))
 	while oid'="" {
+		
+		//keep includes else reject
 		set reject=0
 		set f2=$o(include(freq))
 		while f2'="",reject=0 {
-			set word=$o(include(freq,word))
+			set word=$o(include(f2,word))
 			while word'="",reject=0 {
 				//this word is not in this object, so reject the object id
 				if '$d(^CubesI(pCubeId,word,oid)) set reject=1
-				set word=$o(include(freq,word))
+				set word=$o(include(f2,word))
 			}
 			set f2=$o(include(f2))
 		}
+		
+		//reject excludes
 		set word=$o(exclude(""))
 		while word'="",'reject {
 			//this word is in this object, so exclude it by rejecting the object id
 			if $d(^CubesI(pCubeId,word,oid)) set reject=1
 			set word=$o(exclude(word))	
 		}
+		
+		//remove rejects from oid list
 		if reject kill oids(oid)
+		
 		set oid=$order(oids(oid))
 	}
-	
+			
 	//we are now left with an array of oids that contain all the include words and not the exclude words
-	set results=[]
 	set oid=$o(oids(""))
-	while oid'="" {		
-		for i=2:1:$l(oids(oid),"~") {
-			set word=$p(oids(oid),"~",i)
+	while oid'="" {
+		set word=$order(words(""))
+		while word'="" {
 			set ln=$order(^CubesI(pCubeId,word,oid,""))
 			while ln'="" {
-				set text=$get(^CubesD(pCubeId,oid,ln),"")
-				set type=$lg(^CubesD(pCubeId,oid,0),1)
-				set name=$lg(^CubesD(pCubeId,oid,0),2)
-				set result=[(pCubeId),(word),(oid),(name),(ln),(text)]
-				if text'="" do results.%Push(result)
+				set tmp(oid,ln)={"oid":(oid),"tag":($lg(^CubesD(pCubeId,oid,0),2)),"line":(ln),"text":($get(^CubesD(pCubeId,oid,ln),""))}
 				set ln=$order(^CubesI(pCubeId,word,oid,ln))
-			}
+			}			
+			set word=$order(words(word))
 		}
 		set oid=$o(oids(oid))
 	}
+	
+	//do one final pass for any wildcards
+	set wildcard=$o(wildcards(""))
+	kill ^sean
+	while wildcard'="" {
+		set ^sean($i(^sean))=wildcard
+		set oid=$o(oids(""))
+		while oid'="" {
+			set keep=0
+			set ln=$o(^CubesD(pCubeId,oid,0)) 
+			while ln'="" {
+				if ^CubesD(pCubeId,oid,ln)[wildcard set keep=1
+				set ln=$o(^CubesD(pCubeId,oid,ln)) 				
+			}
+			if keep=0 kill oids(oid)				
+			set oid=$o(oids(oid))
+		}
+		set wildcard=$o(wildcards(wildcard))
+	}
+	
+	//now spin the lines of results out
+	set max=5000,count=0
+	set results=[]
+	set oid=$o(tmp(""))
+	while oid'="",count<max {
+		set ln=$o(tmp(oid,""))
+		while ln'="" {
+			do results.%Push(tmp(oid,ln))
+			set count=count+1
+			set ln=$o(tmp(oid,ln))
+		}
+		set oid=$o(tmp(oid))
+	}
 	do results.%ToJSON()
+	
 	quit $$$OK
 }
 
@@ -137,49 +177,45 @@ ClassMethod BuildIndices(pCubeId As %Integer, pOID As %Integer)
 		set data=^CubesD(pCubeId,pOID,ln)
 		for i=1:1:$l(data) {
 			set char=$e(data,i)
-			if (char?1AN)||(char=".") {
+			if (char?1AN)||(char=".")||(char="-") {
 				set word=word_char		
 			} else {
-				if word'="" {
-					//if the word count grows to 25000 then consider it noise (todo: move this to config)
-					if $d(^CubesI(pCubeId,word)),(^CubesI(pCubeId,word)>24999) {
-						if $d(^CubesI(pCubeId,word))=11 {
-							kill ^CubesI(pCubeId,word)
-							set ^CubesI(pCubeId,word)=25000
-						}
-					} else {
-						set ^CubesI(pCubeId,word,pOID,ln)=""
-						set ^CubesI(pCubeId,word)=$get(^CubesI(pCubeId,word))+1				
-					}
-				}
+				if word'="" do ..IndexWord(pCubeId,word,pOID,ln)
 				set word=""
 			}
 		}
-		if word'="" {
-			//if the word count grows to 5000 then consider it noise (todo: move this to config)
-			if $d(^CubesI(pCubeId,word)),(^CubesI(pCubeId,word)>4999) {
-				if $d(^CubesI(pCubeId,word))=11 {
-					kill ^CubesI(pCubeId,word)
-					set ^CubesI(pCubeId,word)=5000
-				}
-			} else {
-				set ^CubesI(pCubeId,word,pOID,ln)=""
-				set ^CubesI(pCubeId,word)=$get(^CubesI(pCubeId,word))+1				
-			}
-		}		
+		if word'="" do ..IndexWord(pCubeId,word,pOID,ln)		
 		set ln=$o(^CubesD(pCubeId,pOID,ln))
 	}
 }
 
+ClassMethod IndexWord(pCubeId, word, pOID, ln)
+{
+	if word="" quit
+	//set word=$zcvt(word,"L")
+	if $d(^CubesI(pCubeId,word)),(^CubesI(pCubeId,word)=1000000) {
+		if $d(^CubesI(pCubeId,word))=11 {
+			kill ^CubesI(pCubeId,word)
+			set ^CubesI(pCubeId,word)=1000001
+		}	
+	} else {
+		set ^CubesI(pCubeId,word,pOID,ln)=""
+		set ^CubesI(pCubeId,word)=$get(^CubesI(pCubeId,word))+1				
+	}
+	if word["." for i=1:1:$l(word,".") do ..IndexWord(pCubeId,$p(word,".",i),pOID,ln)
+	if word["-" for i=1:1:$l(word,"-") if $p(word,"-",i)?1.A do ..IndexWord(pCubeId,$p(word,"-",i),pOID,ln)
+}
+
 ClassMethod DeleteIndices(pCubeId As %Integer, pOID As %Integer)
 {
+	//TODO: Rewrite after index R&D is out of flux...
 	set ln=$o(^CubesD(pCubeId,pOID,0))
 	while ln'="" {
 		set word=""
 		set data=^CubesD(pCubeId,pOID,ln)
 		for i=1:1:$l(data) {
 			set char=$e(data,i)
-			if (char?1AN)||(char=".") {
+			if (char?1AN)||(char=".")||(char="-") {
 				set word=word_char		
 			} else {
 				if word'="",$d(^CubesI(pCubeId,word,pOID)) {
